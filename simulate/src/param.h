@@ -26,6 +26,8 @@ inline struct SimulationConfig
     int enable_elastic_band;
     int band_attached_link = 0;
 
+    std::string track_body; // body name to track camera, empty = no tracking
+
     void load_from_yaml(const std::string &filename)
     {
         auto cfg = YAML::LoadFile(filename);
@@ -41,6 +43,9 @@ inline struct SimulationConfig
             joystick_bits = cfg["joystick_bits"].as<int>();
             print_scene_information = cfg["print_scene_information"].as<int>();
             enable_elastic_band = cfg["enable_elastic_band"].as<int>();
+            if(cfg["track_body"]) {
+                track_body = cfg["track_body"].as<std::string>();
+            }
         }
         catch(const std::exception& e)
         {

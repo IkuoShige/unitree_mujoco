@@ -100,6 +100,9 @@ namespace
   mjModel *m = nullptr;
   mjData *d = nullptr;
 
+  // camera (global so physics thread can set tracking after model load)
+  mjvCamera cam;
+
   // control noise variables
   mjtNum *ctrlnoise = nullptr;
 
@@ -554,6 +557,21 @@ void PhysicsThread(mj::Simulate *sim, const char *filename)
       free(ctrlnoise);
       ctrlnoise = static_cast<mjtNum *>(malloc(sizeof(mjtNum) * m->nu));
       mju_zero(ctrlnoise, m->nu);
+
+      // set camera tracking if configured
+      if (!param::config.track_body.empty())
+      {
+        int body_id = mj_name2id(m, mjOBJ_BODY, param::config.track_body.c_str());
+        if (body_id >= 0) {
+          cam.type = mjCAMERA_TRACKING;
+          cam.trackbodyid = body_id;
+          cam.distance = 3.0;
+          cam.elevation = -20;
+          std::printf("Camera tracking body '%s' (id=%d)\n", param::config.track_body.c_str(), body_id);
+        } else {
+          std::printf("Warning: track_body '%s' not found in model\n", param::config.track_body.c_str());
+        }
+      }
     }
     else
     {
@@ -661,7 +679,6 @@ int main(int argc, char **argv)
   // scan for libraries in the plugin directory to load additional plugins
   scanPluginLibraries();
 
-  mjvCamera cam;
   mjv_defaultCamera(&cam);
 
   mjvOption opt;
