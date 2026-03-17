@@ -230,7 +230,14 @@ if js_type == "xbox":
     }
 ```
 
-### Elastic band for humanoid 
+### Camera Tracking
+The simulator can automatically follow the robot with the camera. Add `track_body` to `config.yaml`:
+```yaml
+track_body: "torso_link" # Camera tracks this body. Remove or leave empty to disable.
+```
+The camera will use `mjCAMERA_TRACKING` mode to keep the specified body centered in the viewport. For Go2/B2 robots, use `"base_link"` instead of `"torso_link"`.
+
+### Elastic band for humanoid
 Consider humanoid robots are not suitable for starting in ground, a virtual elastic band was designed to simulate the lifting and lowering of humanoid robots. Setting ` enable_elastic_mand/ENABLE_ELSTIC_BAND=1 ` can enable the virtual elastic band. After loading the robot, press' 9 'to activate or release the strap, press' 7' to lower the robot, and press' 8 'to lift the robot.
 
 ## 2. Terrain Generation Tool
