@@ -14,3 +14,14 @@ print_scene_information: 1 # Print link, joint and sensors information of robot
 enable_elastic_band: 1 # Virtual spring band, used for lifting h1
 
 track_body: "torso_link" # Camera tracks this body. Remove or leave empty to disable.
+
+# Stage2 play-like soccer reset knobs (used when deploy requests random spawn on enter)
+stage2_random_ball_on_enter: true
+stage2_spawn_angle_range: [-0.30, 0.30]
+stage2_spawn_radius_range: [-0.05, 0.35]
+stage2_min_ball_distance: 0.25
+stage2_enforce_forward_spawn: true
+stage2_min_forward_spawn_x: 0.05
+stage2_ball_height: 0.11
+stage2_rolling_ball_on_enter: false
+stage2_rolling_speed_range: [0.1, 0.3]

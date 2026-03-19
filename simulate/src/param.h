@@ -4,6 +4,8 @@
 #include <boost/program_options.hpp>
 #include <yaml-cpp/yaml.h>
 #include <filesystem>
+#include <array>
+#include <vector>
 
 namespace param
 {
@@ -27,6 +29,15 @@ inline struct SimulationConfig
     int band_attached_link = 0;
 
     std::string track_body; // body name to track camera, empty = no tracking
+    bool stage2_random_ball_on_enter = false;
+    std::array<float, 2> stage2_spawn_angle_range = {-0.30f, 0.30f};
+    std::array<float, 2> stage2_spawn_radius_range = {-0.05f, 0.35f};
+    float stage2_min_ball_distance = 0.25f;
+    bool stage2_enforce_forward_spawn = true;
+    float stage2_min_forward_spawn_x = 0.05f;
+    float stage2_ball_height = 0.11f;
+    bool stage2_rolling_ball_on_enter = false;
+    std::array<float, 2> stage2_rolling_speed_range = {0.1f, 0.3f};
 
     void load_from_yaml(const std::string &filename)
     {
@@ -45,6 +56,42 @@ inline struct SimulationConfig
             enable_elastic_band = cfg["enable_elastic_band"].as<int>();
             if(cfg["track_body"]) {
                 track_body = cfg["track_body"].as<std::string>();
+            }
+            if (cfg["stage2_random_ball_on_enter"]) {
+                stage2_random_ball_on_enter = cfg["stage2_random_ball_on_enter"].as<bool>();
+            }
+            if (cfg["stage2_spawn_angle_range"]) {
+                auto v = cfg["stage2_spawn_angle_range"].as<std::vector<float>>();
+                if (v.size() == 2) {
+                    stage2_spawn_angle_range = {v[0], v[1]};
+                }
+            }
+            if (cfg["stage2_spawn_radius_range"]) {
+                auto v = cfg["stage2_spawn_radius_range"].as<std::vector<float>>();
+                if (v.size() == 2) {
+                    stage2_spawn_radius_range = {v[0], v[1]};
+                }
+            }
+            if (cfg["stage2_min_ball_distance"]) {
+                stage2_min_ball_distance = cfg["stage2_min_ball_distance"].as<float>();
+            }
+            if (cfg["stage2_enforce_forward_spawn"]) {
+                stage2_enforce_forward_spawn = cfg["stage2_enforce_forward_spawn"].as<bool>();
+            }
+            if (cfg["stage2_min_forward_spawn_x"]) {
+                stage2_min_forward_spawn_x = cfg["stage2_min_forward_spawn_x"].as<float>();
+            }
+            if (cfg["stage2_ball_height"]) {
+                stage2_ball_height = cfg["stage2_ball_height"].as<float>();
+            }
+            if (cfg["stage2_rolling_ball_on_enter"]) {
+                stage2_rolling_ball_on_enter = cfg["stage2_rolling_ball_on_enter"].as<bool>();
+            }
+            if (cfg["stage2_rolling_speed_range"]) {
+                auto v = cfg["stage2_rolling_speed_range"].as<std::vector<float>>();
+                if (v.size() == 2) {
+                    stage2_rolling_speed_range = {v[0], v[1]};
+                }
             }
         }
         catch(const std::exception& e)

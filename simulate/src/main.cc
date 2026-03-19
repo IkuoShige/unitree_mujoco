@@ -18,6 +18,8 @@
 #undef private
 
 #include <chrono>
+#include <array>
+#include <atomic>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -99,6 +101,9 @@ namespace
   // model and data
   mjModel *m = nullptr;
   mjData *d = nullptr;
+  std::atomic<UnitreeSDK2BridgeBase *> g_bridge_ptr{nullptr};
+  mjvScene g_soccer_targets_scn;
+  bool g_soccer_targets_scn_initialized = false;
 
   // camera (global so physics thread can set tracking after model load)
   mjvCamera cam;
@@ -107,6 +112,70 @@ namespace
   mjtNum *ctrlnoise = nullptr;
 
   using Seconds = std::chrono::duration<double>;
+
+  void UpdateSoccerTargetsVisualization(mj::Simulate &sim)
+  {
+    if (!sim.user_scn)
+    {
+      return;
+    }
+
+    sim.user_scn->ngeom = 0;
+
+    UnitreeSDK2BridgeBase *bridge = g_bridge_ptr.load(std::memory_order_acquire);
+    if (!bridge)
+    {
+      return;
+    }
+
+    std::array<float, 3> ball_pos_w{0.0f, 0.0f, 0.0f};
+    std::array<float, 3> goal_pos_w{0.0f, 0.0f, 0.0f};
+    if (!bridge->get_published_soccer_targets(ball_pos_w, goal_pos_w))
+    {
+      return;
+    }
+
+    auto add_sphere = [&](const std::array<float, 3> &pos, float radius, const float rgba[4]) {
+      if (sim.user_scn->ngeom >= sim.user_scn->maxgeom)
+      {
+        return;
+      }
+      mjvGeom *geom = &sim.user_scn->geoms[sim.user_scn->ngeom++];
+      const mjtNum size[3] = {radius, 0.0, 0.0};
+      const mjtNum p[3] = {
+          static_cast<mjtNum>(pos[0]),
+          static_cast<mjtNum>(pos[1]),
+          static_cast<mjtNum>(pos[2]),
+      };
+      mjv_initGeom(geom, mjGEOM_SPHERE, size, p, nullptr, rgba);
+      geom->category = mjCAT_DECOR;
+    };
+
+    const float ball_rgba[4] = {1.0f, 1.0f, 1.0f, 0.90f};
+    const float goal_rgba[4] = {0.20f, 1.0f, 0.20f, 0.90f};
+    add_sphere(ball_pos_w, 0.08f, ball_rgba);
+    add_sphere(goal_pos_w, 0.12f, goal_rgba);
+
+    if (sim.user_scn->ngeom >= sim.user_scn->maxgeom)
+    {
+      return;
+    }
+    mjvGeom *line = &sim.user_scn->geoms[sim.user_scn->ngeom++];
+    const float line_rgba[4] = {1.0f, 0.85f, 0.20f, 0.90f};
+    mjv_initGeom(line, mjGEOM_LINE, nullptr, nullptr, nullptr, line_rgba);
+    const mjtNum from[3] = {
+        static_cast<mjtNum>(ball_pos_w[0]),
+        static_cast<mjtNum>(ball_pos_w[1]),
+        static_cast<mjtNum>(ball_pos_w[2]),
+    };
+    const mjtNum to[3] = {
+        static_cast<mjtNum>(goal_pos_w[0]),
+        static_cast<mjtNum>(goal_pos_w[1]),
+        static_cast<mjtNum>(goal_pos_w[2]),
+    };
+    mjv_connector(line, mjGEOM_LINE, 2.0, from, to);
+    line->category = mjCAT_DECOR;
+  }
 
   //---------------------------------------- plugin handling -----------------------------------------
 
@@ -531,6 +600,12 @@ namespace
             mj_forward(m, d);
             sim.speed_changed = true;
           }
+
+          if (UnitreeSDK2BridgeBase *bridge = g_bridge_ptr.load(std::memory_order_acquire))
+          {
+            bridge->on_after_physics_step();
+          }
+          UpdateSoccerTargetsVisualization(sim);
         }
       } // release std::lock_guard<std::mutex>
     }
@@ -611,12 +686,13 @@ void *UnitreeSdk2BridgeThread(void *arg)
   }
   param::config.band_attached_link = 6 * body_id;
   
-  std::unique_ptr<UnitreeSDK2BridgeBase> interface = nullptr;
+  std::shared_ptr<UnitreeSDK2BridgeBase> interface = nullptr;
   if (m->nu > NUM_MOTOR_IDL_GO) {
-    interface = std::make_unique<G1Bridge>(m, d);
+    interface = std::make_shared<G1Bridge>(m, d);
   } else {
-    interface = std::make_unique<Go2Bridge>(m, d);
+    interface = std::make_shared<Go2Bridge>(m, d);
   }
+  g_bridge_ptr.store(interface.get(), std::memory_order_release);
   interface->start();
   
   while (true)
@@ -700,6 +776,11 @@ int main(int argc, char **argv)
     std::make_unique<mj::GlfwAdapter>(),
     &cam, &opt, &pert, /* is_passive = */ false);
 
+  mjv_defaultScene(&g_soccer_targets_scn);
+  mjv_makeScene(nullptr, &g_soccer_targets_scn, 8);
+  sim->user_scn = &g_soccer_targets_scn;
+  g_soccer_targets_scn_initialized = true;
+
   std::thread unitree_thread(UnitreeSdk2BridgeThread, nullptr);
 
   // start physics thread
@@ -708,6 +789,10 @@ int main(int argc, char **argv)
   glfwSetKeyCallback(static_cast<mj::GlfwAdapter*>(sim->platform_ui.get())->window_,user_key_cb);
   sim->RenderLoop();
   physicsthreadhandle.join();
+  if (g_soccer_targets_scn_initialized) {
+    mjv_freeScene(&g_soccer_targets_scn);
+    g_soccer_targets_scn_initialized = false;
+  }
 
   pthread_exit(NULL);
   return 0;
